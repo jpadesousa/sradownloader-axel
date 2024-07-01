@@ -43,6 +43,15 @@ invalid_characters = [" ","/",">","<","|","\"","?","*","(",")","\\","[","]","{",
 def download_sample_ena (sample, options):
     if not options.quiet:
         print (f"[ENA] Downloading {sample['accession']} into {sample['file_base']}", flush=True)
+    
+    if options.ftp:
+        print("Downloading with FTP", flush=True)
+    
+    if options.wget:
+        print("Downloading with wget", flush=True)
+    
+    if options.axel:
+        print(f"Downloading with axel using {options.axel_num_connections} connections", flush=True)
 
     # Get the FTP locations for the sample
     ena_rest_url = f"https://www.ebi.ac.uk/ena/portal/api/filereport?accession={sample['accession']}&result=read_run&fields=run_accession,fastq_ftp"
@@ -119,43 +128,59 @@ def download_sample_ena (sample, options):
                 time.sleep(sleep_time)
 
             try:
-                #print(f"Connecting to {server}")
-                ftp = FTP(server)
-                #print(f"Logging in")
-                ftp.login()
-                #print(f"Moving to {folder}")
-                ftp.cwd(folder)
+                # Download with FTP
+                if options.ftp:
+                    #print(f"Connecting to {server}")
+                    ftp = FTP(server)
+                    #print(f"Logging in")
+                    ftp.login()
+                    #print(f"Moving to {folder}")
+                    ftp.cwd(folder)
 
-                # We had problems with a simple retbinary causing the control channel to time
-                # out as the transfer took so long so we're going with this more complicated
-                # multithreaded version where we have one thread doing the download and another
-                # sending NOOP commands down the control channel every minute to keep it alive.
-                # Let's see if this fixes things.
+                    # We had problems with a simple retbinary causing the control channel to time
+                    # out as the transfer took so long so we're going with this more complicated
+                    # multithreaded version where we have one thread doing the download and another
+                    # sending NOOP commands down the control channel every minute to keep it alive.
+                    # Let's see if this fixes things.
 
-                with open(outfile, 'wb') as ftp_out:
-                    sock = ftp.transfercmd('RETR ' + file)
-                    sock.setblocking(0)
-                    def background():
-                        while True:
-                            ready = select.select([sock],[],[],30)
-                            if ready:
-                                block = sock.recv(1024*1024)
-                                if not block:
-                                    break
-                                ftp_out.write(block)
-                            else:
-                                # It failed to send data and we timed out
-                                raise Exception("No data before timeout")
-                        sock.close()
-                    t = threading.Thread(target=background)
-                    t.start()
-                    while t.is_alive():
-                        t.join(60)
-                        ftp.voidcmd('NOOP')
+                    with open(outfile, 'wb') as ftp_out:
+                        sock = ftp.transfercmd('RETR ' + file)
+                        sock.setblocking(0)
+                        def background():
+                            while True:
+                                ready = select.select([sock],[],[],30)
+                                if ready:
+                                    block = sock.recv(1024*1024)
+                                    if not block:
+                                        break
+                                    ftp_out.write(block)
+                                else:
+                                    # It failed to send data and we timed out
+                                    raise Exception("No data before timeout")
+                            sock.close()
+                        t = threading.Thread(target=background)
+                        t.start()
+                        while t.is_alive():
+                            t.join(60)
+                            ftp.voidcmd('NOOP')
+                        
+                        #print(f"Retrieving {file}")
                     
-                    #print(f"Retrieving {file}")
+                    ftp.quit()
+                    
+                # Download with wget
+                if options.wget:
+                    wget_cmd = ["wget", "-O", outfile, "-q", url]
+                    result = subprocess.run(wget_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if result.returncode != 0:
+                        raise Exception(f"wget failed: {result.stderr.decode('utf-8')}")
                 
-                ftp.quit()
+                # Download with Axel
+                if options.axel:
+                    axel_cmd = ["axel", "-a", "-n", str(getattr(options, 'axel_num_connections', 10)), "-o", outfile, url]
+                    result = subprocess.run(axel_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if result.returncode != 0:
+                        raise Exception(f"Axel failed: {result.stderr.decode('utf-8')}")
 
                 # Check that the file we downloaded had a non-zero size
                 if os.stat(outfile).st_size == 0:
@@ -362,6 +387,10 @@ def read_options():
     parser.add_argument('--retries', type=int, help="Number of times we'll retry a download before giving up (default 5)", default=5)
     parser.add_argument('--force', type=int, help="Overwrite output files even if they exist", default=False)
     parser.add_argument('--fqdump', type=str, help="Path to the fastq dump program (default fasterq-dump)", default="fasterq-dump")
+    parser.add_argument('--axel-connections', dest="axel_num_connections", type=int, help="Number of connections to use with axel (default 10)", default=10)
+    parser.add_argument('--ftp', dest="ftp", action='store_true', help="Use FTP to download from ENA")
+    parser.add_argument('--wget', dest="wget", action='store_true', help="Use wget to download from ENA")
+    parser.add_argument('--axel', dest="axel", action='store_true', help="Use axel to download from ENA")
     parser.add_argument('--nogeo', dest="nogeo", action='store_true', help="Disable sample name lookup from GEO")
     parser.add_argument('--noena', dest="noena", action='store_true', help="Don't try downloading from ENA")
     parser.add_argument('--noncbi', dest="noncbi", action='store_true', help="Don't try downloading from NBCI")
