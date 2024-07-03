@@ -23,7 +23,7 @@ options:
   --fqdump FQDUMP       Path to the fastq dump program (default fasterq-dump)
   --axel-connections AXEL_NUM_CONNECTIONS
                         Number of connections to use with axel (default 10)
-  --ftp                 Use FTP to download from ENA
+  --ftp                 Use FTP to download from ENA (default)
   --wget                Use wget to download from ENA
   --axel                Use axel to download from ENA
   --nogeo               Disable sample name lookup from GEO
