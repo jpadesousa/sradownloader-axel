@@ -2,7 +2,7 @@
 
 This repository is a fork of [sradownloader](https://github.com/s-andrews/sradownloader). Enhancements include the ability to download samples from the ENA database utilizing [Axel](https://github.com/axel-download-accelerator/axel), a command-line download accelerator. Additionally, users now have the flexibility to choose between FTP or wget for downloads. These modifications were motivated by the need to accelerate sample downloads and to provide an alternative due to FTP downloads being blocked on our HPC cluster.
 
-### New Options for the Tool:
+### New options:
 
 ```bash
 usage: sradownloader [-h] [--quiet] [--version] [--outdir OUTDIR] [--threads THREADS] [--retries RETRIES] [--force FORCE] [--fqdump FQDUMP] [--axel-connections AXEL_NUM_CONNECTIONS] [--ftp] [--wget] [--axel] [--nogeo] [--noena] [--noncbi] runtable
