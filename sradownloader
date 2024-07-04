@@ -151,11 +151,13 @@ def download_sample_ena(sample, options):
                             ftp.voidcmd('NOOP')
                     ftp.quit()
                 elif options.wget:
-                    wget_cmd = ["wget", "-O", outfile, "-q", url]
+                    url = "ftp://" + url if not url.startswith("ftp://") else url
+                    wget_cmd = ["wget", "-nc", "-O", outfile, "-q", url]
                     result = subprocess.run(wget_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if result.returncode != 0:
                         raise Exception(f"wget failed: {result.stderr.decode('utf-8')}")
                 elif options.axel:
+                    url = "ftp://" + url if not url.startswith("ftp://") else url
                     axel_cmd = ["axel", "-a", "-n", str(getattr(options, 'axel_num_connections', 10)), "-o", outfile, url]
                     result = subprocess.run(axel_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if result.returncode != 0:
