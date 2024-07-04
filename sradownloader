@@ -40,18 +40,16 @@ VERSION = "3.11"
 invalid_characters = [" ","/",">","<","|","\"","?","*","(",")","\\","[","]","{","}","!","&","#"]
 
 
-def download_sample_ena (sample, options):
+def download_sample_ena(sample, options):
     if not options.quiet:
-        print (f"[ENA] Downloading {sample['accession']} into {sample['file_base']}", flush=True)
-    
-    if options.ftp:
-        print("Downloading with FTP", flush=True)
+        print(f"[ENA] Downloading {sample['accession']} into {sample['file_base']}", flush=True)
     
     if options.wget:
         print("Downloading with wget", flush=True)
-    
-    if options.axel:
+    elif options.axel:
         print(f"Downloading with axel using {options.axel_num_connections} connections", flush=True)
+    else:
+        print("Downloading with FTP", flush=True)
 
     # Get the FTP locations for the sample
     ena_rest_url = f"https://www.ebi.ac.uk/ena/portal/api/filereport?accession={sample['accession']}&result=read_run&fields=run_accession,fastq_ftp"
@@ -115,7 +113,7 @@ def download_sample_ena (sample, options):
 
         while (attempt_number <= options.retries):
             if not options.quiet:
-                print (f"[ENA Attempt {attempt_number}] Downloading {url} into {outfile}", flush=True)
+                print(f"[ENA Attempt {attempt_number}] Downloading {url} into {outfile}", flush=True)
         
             # For subsequent retries we'll add an increasing delay so we
             # can try to wait past temporary glitches
@@ -128,34 +126,22 @@ def download_sample_ena (sample, options):
                 time.sleep(sleep_time)
 
             try:
-                # Download with FTP
-                if options.ftp:
-                    #print(f"Connecting to {server}")
+                if options.ftp and not (options.wget or options.axel):
                     ftp = FTP(server)
-                    #print(f"Logging in")
                     ftp.login()
-                    #print(f"Moving to {folder}")
                     ftp.cwd(folder)
-
-                    # We had problems with a simple retbinary causing the control channel to time
-                    # out as the transfer took so long so we're going with this more complicated
-                    # multithreaded version where we have one thread doing the download and another
-                    # sending NOOP commands down the control channel every minute to keep it alive.
-                    # Let's see if this fixes things.
-
                     with open(outfile, 'wb') as ftp_out:
                         sock = ftp.transfercmd('RETR ' + file)
                         sock.setblocking(0)
                         def background():
                             while True:
-                                ready = select.select([sock],[],[],30)
+                                ready = select.select([sock], [], [], 30)
                                 if ready:
                                     block = sock.recv(1024*1024)
                                     if not block:
                                         break
                                     ftp_out.write(block)
                                 else:
-                                    # It failed to send data and we timed out
                                     raise Exception("No data before timeout")
                             sock.close()
                         t = threading.Thread(target=background)
@@ -163,40 +149,30 @@ def download_sample_ena (sample, options):
                         while t.is_alive():
                             t.join(60)
                             ftp.voidcmd('NOOP')
-                        
-                        #print(f"Retrieving {file}")
-                    
                     ftp.quit()
-                    
-                # Download with wget
-                if options.wget:
+                elif options.wget:
                     wget_cmd = ["wget", "-O", outfile, "-q", url]
                     result = subprocess.run(wget_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if result.returncode != 0:
                         raise Exception(f"wget failed: {result.stderr.decode('utf-8')}")
-                
-                # Download with Axel
-                if options.axel:
+                elif options.axel:
                     axel_cmd = ["axel", "-a", "-n", str(getattr(options, 'axel_num_connections', 10)), "-o", outfile, url]
                     result = subprocess.run(axel_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if result.returncode != 0:
                         raise Exception(f"Axel failed: {result.stderr.decode('utf-8')}")
 
-                # Check that the file we downloaded had a non-zero size
+                # Check for zero-sized file
                 if os.stat(outfile).st_size == 0:
-                    # It thinks it worked, but nothing was downloaded
                     os.unlink(outfile)
                     raise IOError("Received zero sized file")
 
             except Exception as ex:
                 print(ex)
-                if attempt_number == options.retries:
-                    attempt_number += 1
+                attempt_number += 1
+                if attempt_number > options.retries:
                     raise IOError(f"[ENA] Download repeatedly failed for {sample['accession']} - giving up")
-
                 else:
                     print(f"[ENA] Download failed for {sample['accession']} - going around for another try", flush=True)
-                    attempt_number += 1
                     continue
 
             # It worked
