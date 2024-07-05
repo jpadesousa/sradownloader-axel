@@ -22,7 +22,7 @@ options:
   --force FORCE         Overwrite output files even if they exist
   --fqdump FQDUMP       Path to the fastq dump program (default fasterq-dump)
   --axel-connections AXEL_NUM_CONNECTIONS
-                        Number of connections to use with axel (default 10)
+                        Number of connections to use with axel (default 5)
   --ftp                 Use FTP to download from ENA (default)
   --wget                Use wget to download from ENA
   --axel                Use axel to download from ENA

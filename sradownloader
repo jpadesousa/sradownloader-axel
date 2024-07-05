@@ -151,14 +151,13 @@ def download_sample_ena(sample, options):
                             ftp.voidcmd('NOOP')
                     ftp.quit()
                 elif options.wget:
-                    url = "ftp://" + url if not url.startswith("ftp://") else url
-                    wget_cmd = ["wget", "-nc", "-O", outfile, "-q", url]
+                    url = "http://" + url if not url.startswith("http://") else url
+                    wget_cmd = ["wget", "-O", outfile, "-q", url]
                     result = subprocess.run(wget_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if result.returncode != 0:
                         raise Exception(f"wget failed: {result.stderr.decode('utf-8')}")
                 elif options.axel:
-                    url = "ftp://" + url if not url.startswith("ftp://") else url
-                    axel_cmd = ["axel", "-a", "-n", str(getattr(options, 'axel_num_connections', 10)), "-o", outfile, url]
+                    axel_cmd = ["axel", "-q", "-n", str(getattr(options, 'axel_num_connections', 5)), "-o", outfile, url]
                     result = subprocess.run(axel_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if result.returncode != 0:
                         raise Exception(f"Axel failed: {result.stderr.decode('utf-8')}")
@@ -365,7 +364,7 @@ def read_options():
     parser.add_argument('--retries', type=int, help="Number of times we'll retry a download before giving up (default 5)", default=5)
     parser.add_argument('--force', type=int, help="Overwrite output files even if they exist", default=False)
     parser.add_argument('--fqdump', type=str, help="Path to the fastq dump program (default fasterq-dump)", default="fasterq-dump")
-    parser.add_argument('--axel-connections', dest="axel_num_connections", type=int, help="Number of connections to use with axel (default 10)", default=10)
+    parser.add_argument('--axel-connections', dest="axel_num_connections", type=int, help="Number of connections to use with axel (default 5)", default=5)
     parser.add_argument('--ftp', dest="ftp", action='store_true', help="Use FTP to download from ENA (default)", default=True)
     parser.add_argument('--wget', dest="wget", action='store_true', help="Use wget to download from ENA")
     parser.add_argument('--axel', dest="axel", action='store_true', help="Use axel to download from ENA")
